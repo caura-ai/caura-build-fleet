@@ -307,16 +307,21 @@ def print_summary(results: dict):
     print("═" * 65 + "\n")
 
 
-def reset_fleet_memories() -> None:
-    """Delete all memories in the current fleet after a run."""
+def reset_fleet_memories() -> dict:
+    """Delete all memories in the current fleet after a run.
+
+    Returns a summary dict suitable for merging into --json-output under
+    the ``reset`` key (deleted/failed counts, optional error).
+    """
     fleet_id = os.environ.get("MEMCLAW_FLEET_ID", "fleet")
     log.info("Resetting fleet memories for fleet_id=%r …", fleet_id)
+    summary: dict = {"fleet_id": fleet_id, "deleted": 0, "failed": 0, "ok": True}
     try:
         result = mcp.call_tool("memclaw_list", {"fleet_id": fleet_id}, agent_id=AgentID.MANAGER)
         memories = result.get("items") or result.get("memories") or result.get("results") or []
         if not memories:
             log.info("No memories found to delete.")
-            return
+            return summary
         deleted = 0
         failed = 0
         for mem in memories:
@@ -329,11 +334,17 @@ def reset_fleet_memories() -> None:
             except Exception as exc:
                 log.warning("Failed to delete memory %s: %s", mid, exc)
                 failed += 1
+        summary["deleted"] = deleted
+        summary["failed"] = failed
+        summary["ok"] = failed == 0
         log.info("Fleet reset complete — deleted %d, failed %d.", deleted, failed)
         print(f"\n  Fleet Reset         : {deleted} memories deleted, {failed} failed.")
     except Exception as exc:
         log.error("Fleet reset failed: %s", exc)
         print(f"\n  Fleet Reset         : ⚠️  FAILED — {exc}")
+        summary["ok"] = False
+        summary["error"] = str(exc)
+    return summary
 
 
 def main():
@@ -386,11 +397,14 @@ def main():
         results = run_pipeline(steps)
         print_summary(results)
 
+        reset_summary = None
         if args.reset or args.loop:
-            reset_fleet_memories()
+            reset_summary = reset_fleet_memories()
 
         if args.json_output:
             safe = json.loads(json.dumps(results, default=str))
+            if reset_summary is not None:
+                safe["reset"] = reset_summary
             Path(args.json_output).write_text(json.dumps(safe, indent=2), encoding="utf-8")
             log.info("Full results written to %s", args.json_output)
 
