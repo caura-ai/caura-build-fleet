@@ -51,7 +51,7 @@ import agent_seo
 import agent_codereview
 import manager as agent_manager
 import mcp_client as mcp
-from config import AgentID
+from config import AgentID, mutating_calls
 
 
 def _setup_logging(level: str = "INFO") -> None:
@@ -272,7 +272,7 @@ def print_summary(results: dict):
         print(f"  Pipeline Health      :  {h_icon}  {health}")
 
         mgr_calls = mgr["data"].get("tool_calls", [])
-        write_calls = [c for c in mgr_calls if c.get("tool") and ("write" in c["tool"] or "manage" in c["tool"])]
+        write_calls = mutating_calls(mgr_calls)
         def _is_successful_read(c: dict) -> bool:
             if c.get("tool") not in {"memclaw_list", "memclaw_stats", "memclaw_recall", "memclaw_entity_get", "memclaw_keystones"}:
                 return False

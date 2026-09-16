@@ -1,18 +1,18 @@
 """
 Manager Tenant — Global Read-Only oversight agent.
 Role  : Runs Insights & Audit across ALL fleets. Demonstrates safe data isolation.
-Tools : memclaw_list + memclaw_insights + memclaw_stats only (NO write tools)
+Tools : READ_ONLY_TOOLS below (list, stats, insights, recall, entity_get, keystones)
 Output: Full pipeline contradiction & rule audit report.
 
 Data isolation proof:
-  - allowed_tools explicitly excludes memclaw_write, memclaw_manage, memclaw_evolve,
-    memclaw_tune, memclaw_doc, memclaw_keystones_set
+  - allowed_tools receives READ_ONLY_TOOLS, which excludes every tool named in
+    config.MUTATING_TOOLS (memclaw_write, memclaw_manage)
   - Claude is given no write capability whatsoever in this agent
 """
 
 import logging
 import agent_base
-from config import AgentID
+from config import AgentID, mutating_calls
 
 log = logging.getLogger(__name__)
 
@@ -87,15 +87,17 @@ def run() -> dict:
         user_prompt=PROMPT,
         allowed_tools=READ_ONLY_TOOLS,
     )
-    writes = [c for c in result["tool_calls"] if "write" in c["tool"] or "manage" in c["tool"]]
+    writes = mutating_calls(result["tool_calls"])
     if writes:
-        log.warning("[Manager Tenant] %d unexpected write call(s) detected!", len(writes))
+        log.warning("[Manager Tenant] %d unexpected write call(s) detected: %s",
+                    len(writes), sorted({c["tool"] for c in writes}))
     else:
         log.info("[Manager Tenant] Data isolation VERIFIED — zero write operations")
 
     tool_summary: dict[str, int] = {}
     for c in result["tool_calls"]:
-        tool_summary[c["tool"]] = tool_summary.get(c["tool"], 0) + 1
+        name = c.get("tool") or "<no tool name>"
+        tool_summary[name] = tool_summary.get(name, 0) + 1
     log.info("[Manager Tenant] Tool usage: %s", tool_summary)
     return result
 
