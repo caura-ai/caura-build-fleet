@@ -598,6 +598,44 @@ def _evolve(args: dict) -> dict:
     return {"status": "ok", "note": "evolve not available in this API version"}
 
 
+EXPECTED_MCP_TOOL_NAMES = frozenset({
+    "memclaw_write",
+    "memclaw_recall",
+    "memclaw_insights",
+    "memclaw_list",
+    "memclaw_stats",
+    "memclaw_entity_get",
+    "memclaw_keystones",
+})
+
+
+def validate_mcp_tool_set(tools: list[dict]) -> None:
+    """Verify the live MCP tools/list response matches the expected public tool set.
+
+    REST compatibility mode intentionally exposes additional local facade tools,
+    so exact-set validation applies only to the real MCP transport.
+    """
+    if _transport() != "mcp":
+        return
+
+    actual = {
+        tool.get("name")
+        for tool in tools
+        if isinstance(tool, dict) and isinstance(tool.get("name"), str)
+    }
+
+    missing = sorted(EXPECTED_MCP_TOOL_NAMES - actual)
+    unexpected = sorted(actual - EXPECTED_MCP_TOOL_NAMES)
+
+    if missing or unexpected:
+        lines = ["MemClaw MCP tool set mismatch:"]
+        if missing:
+            lines.append("  missing: " + ", ".join(missing))
+        if unexpected:
+            lines.append("  unexpected: " + ", ".join(unexpected))
+        raise ValueError("\n".join(lines))
+
+
 # ── Tool schemas for OpenAI-compatible function-calling ──────────────────────
 
 def list_tools(agent_id: str | None = None) -> list[dict]:

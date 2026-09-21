@@ -328,3 +328,37 @@ def test_get_base_url_reads_environment_at_call_time(monkeypatch):
 
     monkeypatch.setenv("MEMCLAW_API_URL", "https://second.example.com")
     assert mcp.get_base_url() == "https://second.example.com"
+
+def test_validate_mcp_tool_set_accepts_expected_tools(monkeypatch):
+    monkeypatch.setenv("MEMCLAW_TRANSPORT", "mcp")
+    tools = [{"name": name} for name in mcp.EXPECTED_MCP_TOOL_NAMES]
+
+    mcp.validate_mcp_tool_set(tools)
+
+
+def test_validate_mcp_tool_set_reports_missing_and_unexpected(monkeypatch):
+    monkeypatch.setenv("MEMCLAW_TRANSPORT", "mcp")
+
+    tools = [
+        {"name": name}
+        for name in mcp.EXPECTED_MCP_TOOL_NAMES
+        if name != "memclaw_stats"
+    ]
+    tools.append({"name": "memclaw_future_tool"})
+
+    with pytest.raises(ValueError) as exc:
+        mcp.validate_mcp_tool_set(tools)
+
+    message = str(exc.value)
+
+    assert "missing: memclaw_stats" in message
+    assert "unexpected: memclaw_future_tool" in message
+
+
+def test_validate_mcp_tool_set_skips_rest_compatibility(monkeypatch):
+    monkeypatch.setenv("MEMCLAW_TRANSPORT", "rest")
+
+    tools = [{"name": name} for name in mcp.EXPECTED_MCP_TOOL_NAMES]
+    tools.append({"name": "memclaw_manage"})
+
+    mcp.validate_mcp_tool_set(tools)
