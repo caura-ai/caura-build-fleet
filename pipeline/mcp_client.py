@@ -582,13 +582,6 @@ def _entity_get(args: dict) -> dict:
     return _get("entities", extra or None)
 
 
-def _doc(args: dict) -> dict:
-    doc_id = args.get("doc_id", "")
-    extra = _filter_params({k: v for k, v in args.items() if k != "doc_id"})
-    if doc_id:
-        return _get(f"docs/{doc_id}", extra or None)
-    return _get("docs", extra or None)
-
 
 def _tune(args: dict) -> dict:
     return {"status": "ok", "note": "tune not available in this API version"}
@@ -704,11 +697,6 @@ def list_tools(agent_id: str | None = None) -> list[dict]:
             },
         },
     ]
-
-
-def format_tool_result(tool_call_id: str, result: Any) -> dict:
-    text = json.dumps(result, indent=2) if isinstance(result, (dict, list)) else str(result)
-    return {"type": "tool_result", "tool_use_id": tool_call_id, "content": text}
 
 
 def health_check() -> bool:
