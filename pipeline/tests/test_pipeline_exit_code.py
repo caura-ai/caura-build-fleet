@@ -1,5 +1,6 @@
 """Tests for pipeline exit status."""
 
+import json
 import os
 import sys
 from unittest.mock import Mock
@@ -78,3 +79,26 @@ def test_loop_waits_for_input_after_failed_iteration(monkeypatch):
 
     input_mock.assert_called_once_with()
     assert exc_info.value.code == 1
+
+def test_loop_json_output_keeps_each_iteration(monkeypatch, tmp_path):
+    runs = [
+        {"frontend": {"status": "ok", "run": 1}},
+        {"frontend": {"status": "ok", "run": 2}},
+    ]
+    output = tmp_path / "results.json"
+
+    _prepare_main(monkeypatch, runs[0], "--loop", "--json-output", str(output))
+    monkeypatch.setattr(run_pipeline, "run_pipeline", Mock(side_effect=runs))
+    monkeypatch.setattr(run_pipeline, "reset_fleet_memories", lambda: None)
+    monkeypatch.setattr("builtins.input", Mock(side_effect=[None, KeyboardInterrupt]))
+
+    with pytest.raises(SystemExit) as exc_info:
+        run_pipeline.main()
+
+    assert exc_info.value.code == 0
+    first_output = tmp_path / "results-1.json"
+    second_output = tmp_path / "results-2.json"
+
+    assert not output.exists()
+    assert json.loads(first_output.read_text(encoding="utf-8")) == runs[0]
+    assert json.loads(second_output.read_text(encoding="utf-8")) == runs[1]

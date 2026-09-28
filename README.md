@@ -322,6 +322,9 @@ python pipeline/run_pipeline.py --reset
 # Save full results to JSON
 python pipeline/run_pipeline.py --json-output results.json
 
+# Loop mode keeps each JSON result separately: results-1.json, results-2.json, ...
+python pipeline/run_pipeline.py --loop --json-output results.json
+
 # Verbose debug logging (shows every tool call input and output)
 python pipeline/run_pipeline.py --log-level DEBUG
 

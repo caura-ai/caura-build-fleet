@@ -428,8 +428,11 @@ def main():
 
         if args.json_output:
             safe = json.loads(json.dumps(results, default=str))
-            Path(args.json_output).write_text(json.dumps(safe, indent=2), encoding="utf-8")
-            log.info("Full results written to %s", args.json_output)
+            output_path = Path(args.json_output)
+            if args.loop:
+                output_path = output_path.with_stem(f"{output_path.stem}-{run_number}")
+            output_path.write_text(json.dumps(safe, indent=2), encoding="utf-8")
+            log.info("Full results written to %s", output_path)
 
         if not args.loop:
             break
