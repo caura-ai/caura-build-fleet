@@ -31,6 +31,8 @@ from retry import LLM_CONNECTION_BASE_SECONDS, LLM_RATE_LIMIT_BASE_SECONDS, MAX_
 log = logging.getLogger(__name__)
 
 _DEFAULT_MAX_TOKENS = 4096
+_MIN_MAX_TOKENS = 256
+_max_tokens_warned = False
 
 _client = None  # lazy singleton
 
@@ -42,11 +44,33 @@ def _model() -> str:
     return model
 
 
+def _warn_max_tokens_once(message: str, *args: Any) -> None:
+    # _max_tokens() runs on every LLM call, so warn only the first time.
+    global _max_tokens_warned
+    if not _max_tokens_warned:
+        _max_tokens_warned = True
+        log.warning(message, *args)
+
+
 def _max_tokens() -> int:
-    try:
-        return max(256, int(os.environ.get("LLM_GATEWAY_MAX_TOKENS", _DEFAULT_MAX_TOKENS)))
-    except (TypeError, ValueError):
+    raw = os.environ.get("LLM_GATEWAY_MAX_TOKENS")
+    if raw is None:
         return _DEFAULT_MAX_TOKENS
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        _warn_max_tokens_once(
+            "LLM_GATEWAY_MAX_TOKENS=%r is not an integer — using default %d",
+            raw, _DEFAULT_MAX_TOKENS,
+        )
+        return _DEFAULT_MAX_TOKENS
+    if value < _MIN_MAX_TOKENS:
+        _warn_max_tokens_once(
+            "LLM_GATEWAY_MAX_TOKENS=%d is below the minimum — using %d",
+            value, _MIN_MAX_TOKENS,
+        )
+        return _MIN_MAX_TOKENS
+    return value
 
 
 def _llm() -> OpenAI:
