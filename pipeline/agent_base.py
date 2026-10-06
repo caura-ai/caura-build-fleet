@@ -294,6 +294,9 @@ def _tool_message_content(tool_name: str, result: Any, max_len: int = 4000) -> s
                     "content": _truncate_text(item.get("content", ""), 400),
                 })
 
+            if len(raw_list) > 5:
+                compact["omitted"] = len(raw_list) - 5
+
     elif tool_name == "memclaw_insights":
         compact = {
             "focus": result.get("focus"),
