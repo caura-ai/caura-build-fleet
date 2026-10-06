@@ -273,7 +273,7 @@ def _tool_message_content(tool_name: str, result: Any, max_len: int = 4000) -> s
 
     if not isinstance(result, dict):
         text = json.dumps(result)
-        return text[:max_len] + "…" if len(text) > max_len else text
+        return _truncate_json(text, max_len)
 
     compact: dict[str, Any] = result
 
@@ -305,7 +305,30 @@ def _tool_message_content(tool_name: str, result: Any, max_len: int = 4000) -> s
         }
 
     text = json.dumps(compact, ensure_ascii=False)
-    return text[:max_len] + "…" if len(text) > max_len else text
+    return _truncate_json(text, max_len)
+
+
+def _truncate_json(text: str, max_len: int) -> str:
+    """Wrap oversized JSON in a valid preview, including escaping in the budget."""
+    if len(text) <= max_len:
+        return text
+
+    wrapper = {"truncated": True, "preview": ""}
+    overhead = len(json.dumps(wrapper, ensure_ascii=False))
+    if max_len < overhead:
+        raise ValueError(f"max_len must be at least {overhead} for a JSON preview")
+
+    low, high = 0, max_len - overhead
+    while low < high:
+        middle = (low + high + 1) // 2
+        wrapper["preview"] = text[:middle]
+        if len(json.dumps(wrapper, ensure_ascii=False)) <= max_len:
+            low = middle
+        else:
+            high = middle - 1
+
+    wrapper["preview"] = text[:low]
+    return json.dumps(wrapper, ensure_ascii=False)
 
 
 def _truncate_text(value: Any, max_len: int) -> str:
