@@ -226,6 +226,18 @@ def run_agent(
                 "content":      _tool_message_content(tool_name, result),
             })
 
+    else:
+        # The while loop exhausted max_iterations without the model ever stopping, so
+        # `final_text` is whatever the last response happened to contain and the run is
+        # not a normal completion. Without this the cap silently truncates a run — and
+        # because the model was still asking for tools, the work is genuinely unfinished
+        # rather than merely at a boundary.
+        log.warning(
+            "[%s] hit max_iterations (%d) with tool calls still pending",
+            agent_id,
+            max_iterations,
+        )
+
     return {
         "agent_id":   agent_id,
         "final_text": final_text,

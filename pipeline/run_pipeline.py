@@ -31,10 +31,17 @@ import argparse
 from datetime import datetime
 from pathlib import Path
 
-# Fix Windows console encoding so UTF-8 chars print correctly
+# Fix Windows console encoding so UTF-8 chars print correctly.
+# Reconfigure the existing stream in place rather than swapping sys.stdout for a new
+# TextIOWrapper: replacing the object leaves whoever captured it (pytest, a parent
+# process, a notebook) holding a stream that is no longer the live one, which breaks
+# pytest's capture teardown on Windows with "ValueError: I/O operation on closed file"
+# — `pytest tests/` then collects nothing at all.
 if sys.platform == "win32":
-    import io
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):  # pragma: no cover - non-reconfigurable stream
+        pass
 
 # Load .env BEFORE any module that reads env vars at import time
 try:

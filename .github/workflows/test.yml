@@ -22,3 +22,14 @@ jobs:
 
       - name: Run tests
         run: cd pipeline && pytest tests/ -v
+        env:
+          # The unit tests mock the LLM and MemClaw clients, so these only need to be
+          # present and non-empty, not valid. Without them agent_base._model() raises
+          # EnvironmentError, and six tests fail in Actions only — never locally, where
+          # a developer's .env supplies the same values.
+          LLM_GATEWAY_MODEL: test-model
+          LLM_GATEWAY_API_KEY: test-key
+          LLM_GATEWAY_API_URL: https://example.com/v1
+          MEMCLAW_API_KEY: test-key
+          MEMCLAW_TENANT_ID: test-tenant
+          MEMCLAW_FLEET_ID: test-fleet
