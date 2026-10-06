@@ -19,6 +19,9 @@ class AgentID:
     SEO          = "seo-agent"
     CODE_REVIEW  = "code-review-agent"
     MANAGER      = "manager-tenant"
+    # Owns fleet teardown (--reset / --loop). Kept separate from MANAGER so the
+    # audit trail never shows the read-only oversight agent deleting memories.
+    ORCHESTRATOR = "orchestrator"
 
 
 MAX_MEMORY_CONTENT_LEN = 4000   # chars; MemClaw API limit (undocumented, conservative)

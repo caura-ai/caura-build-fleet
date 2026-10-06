@@ -155,6 +155,12 @@ def run_pipeline(steps) -> dict:
         _bootstrap_agent(AgentID.MANAGER, "Manager Tenant")
     if agent_codereview in module_set:
         _bootstrap_agent(AgentID.CODE_REVIEW, "Code Review Agent")
+    # The orchestrator owns fleet teardown, so register it here rather than inside
+    # reset_fleet_memories(). Registration writes two seed memories, and teardown
+    # cannot write into the fleet it is about to empty: the seeds would either be
+    # counted as deletions or, if the write has not propagated when the list runs,
+    # outlive the reset and leak into the next --loop iteration.
+    _bootstrap_agent(AgentID.ORCHESTRATOR, "Orchestrator")
 
     results = {}
     for i, (name, module, _) in enumerate(steps, 1):
@@ -316,11 +322,24 @@ def print_summary(results: dict):
 
 
 def reset_fleet_memories() -> None:
-    """Delete all memories in the current fleet after a run."""
+    """Delete all memories in the current fleet after a run.
+
+    Teardown runs under the ORCHESTRATOR identity, not the Manager. The Manager is
+    the agent this repo advertises as read-only, and its allowlist omits
+    memclaw_manage entirely; attributing a fleet-wide delete to it contradicts both
+    that claim and the audit trail it exists to produce.
+
+    The orchestrator identity is registered in run_pipeline()'s pre-flight, not
+    here: registration performs bootstrap writes, and teardown must not write into
+    the fleet it is emptying.
+
+    The orchestrator identity needs trust_level >= 2 for memclaw_list, exactly like
+    the Manager — see the README "Elevate agent trust" step for its curl command.
+    """
     fleet_id = os.environ.get("MEMCLAW_FLEET_ID", "fleet")
     log.info("Resetting fleet memories for fleet_id=%r …", fleet_id)
     try:
-        result = mcp.call_tool("memclaw_list", {"fleet_id": fleet_id}, agent_id=AgentID.MANAGER)
+        result = mcp.call_tool("memclaw_list", {"fleet_id": fleet_id}, agent_id=AgentID.ORCHESTRATOR)
         memories = result.get("items") or result.get("memories") or result.get("results") or []
         if not memories:
             log.info("No memories found to delete.")
@@ -332,7 +351,7 @@ def reset_fleet_memories() -> None:
             if not mid:
                 continue
             try:
-                mcp.call_tool("memclaw_manage", {"op": "delete", "memory_id": mid}, agent_id=AgentID.MANAGER)
+                mcp.call_tool("memclaw_manage", {"op": "delete", "memory_id": mid}, agent_id=AgentID.ORCHESTRATOR)
                 deleted += 1
             except Exception as exc:
                 log.warning("Failed to delete memory %s: %s", mid, exc)

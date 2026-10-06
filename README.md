@@ -211,7 +211,7 @@ MEMCLAW_FLEET_ID=memclaw-build-fleet
 
 #### 3. Elevate agent trust (one-time, required)
 
-The Manager and Code Review agents need `trust_level=2` to call `memclaw_stats`, `memclaw_list`, and `memclaw_insights`. Run these two commands once per tenant; they persist and never need repeating:
+The Manager, Code Review, and Orchestrator identities need `trust_level=2` to call `memclaw_stats`, `memclaw_list`, and `memclaw_insights`. Run these three commands once per tenant; they persist and never need repeating:
 
 ```bash
 curl -X PATCH "https://memclaw.net/api/agents/manager-tenant/trust?tenant_id=YOUR_TENANT_ID" \
@@ -223,7 +223,14 @@ curl -X PATCH "https://memclaw.net/api/agents/code-review-agent/trust?tenant_id=
   -H "X-API-Key: $MEMCLAW_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"trust_level": 2}'
+
+curl -X PATCH "https://memclaw.net/api/agents/orchestrator/trust?tenant_id=YOUR_TENANT_ID" \
+  -H "X-API-Key: $MEMCLAW_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"trust_level": 2}'
 ```
+
+> The `orchestrator` identity owns fleet teardown (`--reset`, `--loop`). It is deliberately separate from the Manager so that the audit trail never records the read-only oversight agent deleting memories. If you already set this project up before that identity existed, run the third command once — otherwise `--reset` will report `Fleet Reset: ⚠️ FAILED` on a 403.
 
 > If you skip this step the Manager and Code Review agents will receive 403 errors and the pipeline will report `Data Isolation: ⚠️ UNCONFIRMED`. See the [Troubleshooting](#troubleshooting) table for details.
 
@@ -290,7 +297,7 @@ Ollama's OpenAI-compatible server accepts any non-empty string as the API key. `
 
 #### 5. Elevate agent trust (one-time, required)
 
-Same as Option A; run the two `curl -X PATCH` commands from [Step 3 above](#3-elevate-agent-trust-one-time-required) before running the pipeline.
+Same as Option A; run the three `curl -X PATCH` commands from [Step 3 above](#3-elevate-agent-trust-one-time-required) before running the pipeline.
 
 #### 6. Start Ollama and run
 
@@ -518,6 +525,7 @@ Opens at `http://localhost:5173`. Set transport to HTTP, URL to `https://memclaw
 | LLM gateway 429 rate limit | Provider quota exceeded | Pipeline retries automatically (4 attempts, 20–80s backoff). Set `LLM_GATEWAY_MAX_TOKENS=2048` to reduce per-request size |
 | Inline comment breaks `.env` value | Shell comments inside env values | `LLM_GATEWAY_MODEL=my-model` — no trailing `# comments` on the same line |
 | Recall returns memories from a different run | `MEMCLAW_FLEET_ID` typo (e.g. `piepline` vs `pipeline`) | Recall queries by tenant first; a typo'd `fleet_id` still returns results but mixes namespaces. Standardise one value in `.env` and keep it consistent across all runs |
+| `Fleet Reset: ⚠️ FAILED` on `--reset` / `--loop` with a 403 | The `orchestrator` identity owns teardown and needs `trust_level=2` for `memclaw_list` | Elevate it via the admin API: `curl -X PATCH "https://memclaw.net/api/agents/orchestrator/trust?tenant_id=<your-tenant-id>" -H "X-API-Key: $MEMCLAW_API_KEY" -d '{"trust_level": 2}'`. Only needs to be done once per tenant. |
 | Manager reads return 403 / `Data Isolation: ⚠️ UNCONFIRMED` | Agent `trust_level` is 1; `memclaw_stats`, `memclaw_list`, and `memclaw_insights` require trust ≥ 2 | Elevate trust via the admin API: `curl -X PATCH "https://memclaw.net/api/agents/manager-tenant/trust?tenant_id=<your-tenant-id>" -H "X-API-Key: $MEMCLAW_API_KEY" -d '{"trust_level": 2}'`. Do the same for `code-review-agent`. Only needs to be done once per tenant. |
 | `memclaw_insights` returns 403 for Code Review | Agent `trust_level` is 1 | Same fix as above; elevate `code-review-agent` trust to 2 via the admin API |
 
