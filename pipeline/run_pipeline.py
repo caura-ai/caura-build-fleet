@@ -406,6 +406,7 @@ def main():
             ok = mcp.health_check()
             if ok:
                 tools = mcp.list_tools()
+                mcp.validate_mcp_tool_set(tools)
                 log.info("MemClaw API reachable — %d tools defined: %s",
                          len(tools), [t["name"] for t in tools])
             else:
