@@ -75,6 +75,13 @@ PIPELINE_STEPS = [
 ]
 
 
+def _select_pipeline_steps(steps, skip_manager: bool):
+    """Return the requested pipeline steps without assuming Manager is last."""
+    if not skip_manager:
+        return steps
+    return [step for step in steps if step[1] is not agent_manager]
+
+
 def check_env() -> list[str]:
     return [k for k in ("LLM_GATEWAY_API_KEY", "LLM_GATEWAY_API_URL", "LLM_GATEWAY_MODEL",
                         "MEMCLAW_API_KEY", "MEMCLAW_TENANT_ID", "MEMCLAW_FLEET_ID")
@@ -398,7 +405,7 @@ def main():
         print("Copy .env.example → .env and fill in your keys.")
         sys.exit(1)
 
-    steps = PIPELINE_STEPS[:-1] if args.skip_manager else PIPELINE_STEPS
+    steps = _select_pipeline_steps(PIPELINE_STEPS, args.skip_manager)
 
     if args.dry_run:
         log.info("Checking MemClaw API connectivity...")
