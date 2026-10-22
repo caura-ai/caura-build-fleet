@@ -332,3 +332,43 @@ def test_run_agent_warns_when_max_iterations_reached(
     assert result["iterations"] == 3
     assert len(result["tool_calls"]) == 3
     assert "hit max_iterations (3) with tool calls still pending" in caplog.text
+
+# ── _max_tokens ───────────────────────────────────────────────────────────────
+
+@pytest.fixture(autouse=False)
+def _reset_max_tokens_warning(monkeypatch):
+    monkeypatch.setattr(agent_base, "_max_tokens_warned", False)
+
+
+def test_max_tokens_unset_uses_default(monkeypatch, _reset_max_tokens_warning):
+    monkeypatch.delenv("LLM_GATEWAY_MAX_TOKENS", raising=False)
+    assert agent_base._max_tokens() == 4096
+
+
+def test_max_tokens_valid_value(monkeypatch, _reset_max_tokens_warning, caplog):
+    monkeypatch.setenv("LLM_GATEWAY_MAX_TOKENS", "2048")
+    with caplog.at_level("WARNING", logger="agent_base"):
+        assert agent_base._max_tokens() == 2048
+    assert "LLM_GATEWAY_MAX_TOKENS" not in caplog.text
+
+
+def test_max_tokens_invalid_falls_back_and_warns(monkeypatch, _reset_max_tokens_warning, caplog):
+    monkeypatch.setenv("LLM_GATEWAY_MAX_TOKENS", "abc")
+    with caplog.at_level("WARNING", logger="agent_base"):
+        assert agent_base._max_tokens() == 4096
+    assert "LLM_GATEWAY_MAX_TOKENS" in caplog.text
+
+
+def test_max_tokens_below_minimum_is_clamped_and_warns(monkeypatch, _reset_max_tokens_warning, caplog):
+    monkeypatch.setenv("LLM_GATEWAY_MAX_TOKENS", "10")
+    with caplog.at_level("WARNING", logger="agent_base"):
+        assert agent_base._max_tokens() == 256
+    assert "LLM_GATEWAY_MAX_TOKENS" in caplog.text
+
+
+def test_max_tokens_warns_only_once(monkeypatch, _reset_max_tokens_warning, caplog):
+    monkeypatch.setenv("LLM_GATEWAY_MAX_TOKENS", "abc")
+    with caplog.at_level("WARNING", logger="agent_base"):
+        agent_base._max_tokens()
+        agent_base._max_tokens()
+    assert caplog.text.count("LLM_GATEWAY_MAX_TOKENS") == 1
