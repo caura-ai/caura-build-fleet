@@ -36,7 +36,7 @@ _mcp_transport_at_cache: str | None = None  # transport value when cache was las
 
 
 def _cfg(key: str, default: str = "") -> str:
-    return os.environ.get(key, default)
+    return (os.environ.get(key) or "").strip() or default
 
 def get_base_url() -> str:
     return _cfg("MEMCLAW_API_URL", f"https://{MEMCLAW_API_DOMAIN}")

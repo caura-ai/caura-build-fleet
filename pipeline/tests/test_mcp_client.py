@@ -389,6 +389,13 @@ def test_get_mcp_url_prefers_explicit_mcp_url(monkeypatch):
     assert mcp.get_mcp_url() == "https://custom.example.com/mcp"
 
 
+def test_get_mcp_url_treats_blank_value_as_unset(monkeypatch):
+    monkeypatch.setenv("MEMCLAW_API_URL", "https://api.example.com")
+    monkeypatch.setenv("MEMCLAW_MCP_URL", "")
+
+    assert mcp.get_mcp_url() == "https://api.example.com/mcp"
+
+
 def test_get_base_url_reads_environment_at_call_time(monkeypatch):
     monkeypatch.setenv("MEMCLAW_API_URL", "https://first.example.com")
     assert mcp.get_base_url() == "https://first.example.com"
