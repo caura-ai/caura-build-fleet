@@ -10,17 +10,18 @@ Ensure your `.env` or environment has `MEMCLAW_API_URL`, `MEMCLAW_API_KEY`,
 import os
 import json
 import requests
+from mcp_client import _cfg
 
 
 def main():
-    base = os.environ.get("MEMCLAW_API_URL", "https://memclaw.net").rstrip("/")
+    base = _cfg("MEMCLAW_API_URL", "https://memclaw.net").rstrip("/")
     url = f"{base}/api/v1/recall"
     headers = {
         "X-API-Key": os.environ.get("MEMCLAW_API_KEY", ""),
         "Content-Type": "application/json",
     }
     body = {
-        "fleet_id": os.environ.get("MEMCLAW_FLEET_ID", "fleet"),
+        "fleet_id": _cfg("MEMCLAW_FLEET_ID", "fleet"),
         "tenant_id": os.environ.get("MEMCLAW_TENANT_ID", ""),
         "agent_id": "debug-agent",
         "query": "architecture CSS layout performance bundle constraint images schema SEO",

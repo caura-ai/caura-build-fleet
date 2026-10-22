@@ -324,7 +324,7 @@ def print_summary(results: dict):
 
 def reset_fleet_memories() -> None:
     """Delete all memories in the current fleet after a run."""
-    fleet_id = os.environ.get("MEMCLAW_FLEET_ID", "fleet")
+    fleet_id = mcp._cfg("MEMCLAW_FLEET_ID", "fleet")
     log.info("Resetting fleet memories for fleet_id=%r …", fleet_id)
     try:
         result = mcp.call_tool("memclaw_list", {"fleet_id": fleet_id}, agent_id=AgentID.MANAGER)
