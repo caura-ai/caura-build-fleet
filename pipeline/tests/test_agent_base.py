@@ -52,6 +52,53 @@ def test_summarise_dict():
     assert "key" in result
 
 
+@pytest.mark.parametrize("tool_name", ["memclaw_insights", "custom_tool"])
+@pytest.mark.parametrize("value", ["y" * 5000, '"\\\n\t🙂' * 1200], ids=["plain", "escaped"])
+def test_tool_message_oversized_dict_stays_valid_json(tool_name, value):
+    payload = {"focus": "x", "by_agent": {"a": value}}
+    content = agent_base._tool_message_content(tool_name, payload)
+
+    parsed = json.loads(content)
+    assert parsed["truncated"] is True
+    assert parsed["preview"].startswith('{"focus": "x"')
+    assert len(content) <= 4000
+    assert payload == {"focus": "x", "by_agent": {"a": value}}
+
+
+def test_tool_message_oversized_list_stays_valid_json():
+    content = agent_base._tool_message_content("custom_tool", ['"\\\n' * 5000])
+    parsed = json.loads(content)
+    assert parsed["truncated"] is True
+    assert parsed["preview"].startswith("[")
+    assert len(content) <= 4000
+
+
+@pytest.mark.parametrize("payload", [{"content": "🙂"}, ["🙂", 1], 42, None])
+def test_tool_message_small_json_is_unchanged(payload):
+    expected = json.dumps(payload, ensure_ascii=False) if isinstance(payload, dict) else json.dumps(payload)
+    assert agent_base._tool_message_content("custom_tool", payload) == expected
+
+
+def test_tool_message_exact_budget_is_unchanged():
+    payload = {"content": "x" * 20}
+    expected = json.dumps(payload, ensure_ascii=False)
+    assert agent_base._tool_message_content("custom_tool", payload, max_len=len(expected)) == expected
+
+
+def test_tool_message_preview_includes_json_escaping_in_budget():
+    payload = {"content": '"\\\n🙂' * 100}
+    content = agent_base._tool_message_content("custom_tool", payload, max_len=100)
+    parsed = json.loads(content)
+    assert parsed["truncated"] is True
+    assert parsed["preview"]
+    assert len(content) <= 100
+
+
+def test_tool_message_budget_too_small_for_preview():
+    with pytest.raises(ValueError, match="max_len must be at least"):
+        agent_base._tool_message_content("custom_tool", {"content": "x" * 100}, max_len=10)
+
+
 # ── run_agent — no tool calls (pure text response) ───────────────────────────
 
 @patch("agent_base._llm")
