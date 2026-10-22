@@ -8,6 +8,7 @@ import sys
 import os
 import pytest
 from unittest.mock import patch, MagicMock
+from requests.exceptions import HTTPError
 
 # Make pipeline/ importable from tests/
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -22,10 +23,12 @@ os.environ.setdefault("LLM_GATEWAY_API_KEY", "test-llm-key")
 import mcp_client as mcp
 
 
-def _json_response(data: dict, status: int = 200) -> MagicMock:
+def _json_response(data: dict, status: int = 200, headers: dict | None = None) -> MagicMock:
     r = MagicMock()
     r.status_code = status
     r.headers = {"Content-Type": "application/json"}
+    r.headers.update(headers or {})
+    r.text = json.dumps(data)
     r.json.return_value = data
     r.raise_for_status = MagicMock()
     return r
@@ -370,6 +373,91 @@ def test_retry_on_500(mock_get, mock_sleep):
     assert result == {"total": 3}
     assert mock_get.call_count == 3
     assert mock_sleep.call_count == 2  # slept before attempt 2 and 3
+
+
+@patch("mcp_client.time.sleep")
+@patch("mcp_client.requests.post")
+def test_rest_retries_on_429_and_honors_retry_after(mock_post, mock_sleep):
+    limited = _json_response(
+        {"error": "rate limited"},
+        429,
+        headers={"Retry-After": "7"},
+    )
+    mock_post.side_effect = [limited, _json_response({"id": "mem-1"}, 201)]
+
+    result = mcp._request_with_retry(
+        "POST",
+        "memories",
+        json_body={"content": "remember this"},
+        max_attempts=2,
+    )
+
+    assert result == {"id": "mem-1"}
+    assert mock_post.call_count == 2
+    mock_sleep.assert_called_once_with(7.0)
+
+
+@patch("mcp_client.time.sleep")
+@patch("mcp_client.requests.post")
+def test_rest_raises_after_429_retries_are_exhausted(mock_post, mock_sleep):
+    limited = _json_response(
+        {"error": "rate limited"},
+        429,
+        headers={"Retry-After": "1"},
+    )
+    limited.raise_for_status.side_effect = HTTPError(response=limited)
+    mock_post.return_value = limited
+
+    with pytest.raises(HTTPError):
+        mcp._request_with_retry(
+            "POST",
+            "memories",
+            json_body={"content": "remember this"},
+            max_attempts=3,
+        )
+
+    assert mock_post.call_count == 3
+    assert [call.args[0] for call in mock_sleep.call_args_list] == [1.0, 1.0]
+
+
+@patch("mcp_client.time.sleep")
+@patch("mcp_client.requests.post")
+def test_mcp_retries_on_429_and_honors_retry_after(mock_post, mock_sleep):
+    limited = _json_response(
+        {"error": "rate limited"},
+        429,
+        headers={"Retry-After": "2.5"},
+    )
+    ok = _json_response({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {"tools": []},
+    })
+    mock_post.side_effect = [limited, ok]
+
+    result = mcp._mcp_json_rpc("tools/list")
+
+    assert result == {"tools": []}
+    assert mock_post.call_count == 2
+    mock_sleep.assert_called_once_with(2.5)
+
+
+@patch("mcp_client.time.sleep")
+@patch("mcp_client.requests.post")
+def test_mcp_raises_after_429_retries_are_exhausted(mock_post, mock_sleep):
+    limited = _json_response(
+        {"error": "rate limited"},
+        429,
+        headers={"Retry-After": "1"},
+    )
+    limited.raise_for_status.side_effect = HTTPError(response=limited)
+    mock_post.return_value = limited
+
+    with pytest.raises(HTTPError):
+        mcp._mcp_json_rpc("tools/list")
+
+    assert mock_post.call_count == mcp.MEMCLAW_MAX_ATTEMPTS
+    assert [call.args[0] for call in mock_sleep.call_args_list] == [1.0, 1.0]
 
 def test_get_mcp_url_reads_environment_at_call_time(monkeypatch):
     monkeypatch.setenv("MEMCLAW_API_URL", "https://first.example.com")

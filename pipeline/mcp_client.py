@@ -13,6 +13,7 @@ Compatibility path:
 
 import os
 import json
+import math
 import time
 import logging
 import requests
@@ -100,6 +101,20 @@ def _next_mcp_id() -> int:
     return _mcp_request_id
 
 
+def _retry_wait_seconds(response: requests.Response, attempt: int) -> float:
+    """Return a server-requested delay, or fall back to exponential backoff."""
+    retry_after = response.headers.get("Retry-After")
+    if retry_after is not None:
+        try:
+            wait = float(retry_after)
+        except (TypeError, ValueError):
+            pass
+        else:
+            if math.isfinite(wait) and wait >= 0:
+                return wait
+    return backoff_delay(MEMCLAW_BASE_SECONDS, attempt)
+
+
 def _decode_json_or_sse(response: requests.Response) -> dict:
     ct = response.headers.get("Content-Type", "")
     if "application/json" in ct:
@@ -147,16 +162,16 @@ def _mcp_json_rpc(method: str, params: dict | None = None, *, expect_response: b
             if session_id:
                 _mcp_session_id = session_id
 
-            if 400 <= response.status_code < 500:
-                log.error("MemClaw MCP %s → %d: %s", method, response.status_code, response.text[:500])
-                response.raise_for_status()
-
-            if response.status_code >= 500:
+            if response.status_code == 429 or response.status_code >= 500:
                 if attempt < MEMCLAW_MAX_ATTEMPTS - 1:
-                    wait = backoff_delay(MEMCLAW_BASE_SECONDS, attempt)
+                    wait = _retry_wait_seconds(response, attempt)
                     log.warning("MemClaw MCP %s → %d, retrying in %.1fs", method, response.status_code, wait)
                     time.sleep(wait)
                     continue
+                response.raise_for_status()
+
+            if 400 <= response.status_code < 500:
+                log.error("MemClaw MCP %s → %d: %s", method, response.status_code, response.text[:500])
                 response.raise_for_status()
 
             if not expect_response:
@@ -288,8 +303,8 @@ def _request_with_retry(
 ) -> dict:
     """
     Make an HTTP request to the MemClaw API with exponential backoff retry.
-    Retries on transient errors (5xx, Timeout, connection errors).
-    Raises on 4xx (caller's fault) or after max_attempts exhausted.
+    Retries on transient errors (429, 5xx, Timeout, connection errors).
+    Raises on other 4xx responses or after max_attempts is exhausted.
     """
     url = _api(path)
     for attempt in range(max_attempts):
@@ -303,7 +318,17 @@ def _request_with_retry(
             else:
                 raise ValueError(f"Unsupported HTTP method: {method}")
 
-            # 4xx → caller error, don't retry. Log response body to aid debugging.
+            # Rate limits and 5xx responses are transient, so retry with backoff.
+            if r.status_code == 429 or r.status_code >= 500:
+                if attempt < max_attempts - 1:
+                    wait = _retry_wait_seconds(r, attempt)
+                    log.warning("MemClaw %s %s → %d, retrying in %.1fs (attempt %d/%d)",
+                                method, path, r.status_code, wait, attempt + 1, max_attempts)
+                    time.sleep(wait)
+                    continue
+                r.raise_for_status()
+
+            # Other 4xx responses are caller errors. Log the body to aid debugging.
             if 400 <= r.status_code < 500:
                 ct = r.headers.get("Content-Type", "")
                 body_preview = None
@@ -315,16 +340,6 @@ def _request_with_retry(
                 except Exception:
                     body_preview = r.text if hasattr(r, "text") else "<unavailable>"
                 log.error("MemClaw %s %s → %d (client error): %s", method, path, r.status_code, body_preview)
-                r.raise_for_status()
-
-            # 5xx → transient, retry with backoff
-            if r.status_code >= 500:
-                if attempt < max_attempts - 1:
-                    wait = backoff_delay(MEMCLAW_BASE_SECONDS, attempt)
-                    log.warning("MemClaw %s %s → %d, retrying in %.1fs (attempt %d/%d)",
-                                method, path, r.status_code, wait, attempt + 1, max_attempts)
-                    time.sleep(wait)
-                    continue
                 r.raise_for_status()
 
             # Validate JSON response
