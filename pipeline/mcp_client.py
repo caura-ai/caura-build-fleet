@@ -327,6 +327,10 @@ def _request_with_retry(
                     continue
                 r.raise_for_status()
 
+            # Successful no-content responses (e.g. DELETE) have no JSON body.
+            if r.status_code == 204:
+                return {}
+
             # Validate JSON response
             ct = r.headers.get("Content-Type", "")
             if "application/json" not in ct:
