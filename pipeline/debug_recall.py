@@ -28,7 +28,7 @@ def main():
     }
 
     print("POST", url)
-    print("Headers:", {k: (v[:8] + '...' if k == 'X-API-Key' and v else v) for k, v in headers.items()})
+    print("Headers:", {k: ("****" if k == "X-API-Key" and v else v) for k, v in headers.items()})
     print("Body:", json.dumps(body, indent=2))
 
     try:
