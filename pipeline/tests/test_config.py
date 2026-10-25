@@ -1,38 +1,6 @@
-"""Unit tests for config.py — agent IDs, memory types, and constants."""
+"""Unit tests for config.py — agent IDs and constants."""
 
-from config import AgentID, MemoryType, MAX_MEMORY_CONTENT_LEN, MEMCLAW_API_DOMAIN
-
-
-# ── MemoryType enum ───────────────────────────────────────────────────────────
-
-def test_memory_type_has_exactly_four_members():
-    assert len(MemoryType) == 4
-
-
-def test_memory_type_values_are_lowercase_strings():
-    for member in MemoryType:
-        assert member.value == member.value.lower()
-        assert isinstance(member.value, str)
-
-
-def test_memory_type_members():
-    assert MemoryType.decision == "decision"
-    assert MemoryType.fact == "fact"
-    assert MemoryType.rule == "rule"
-    assert MemoryType.insight == "insight"
-
-
-def test_memory_type_is_str_subclass():
-    """MemoryType inherits from str so members can be used directly as strings."""
-    for member in MemoryType:
-        assert isinstance(member, str)
-
-
-def test_memory_type_lookup_by_value():
-    assert MemoryType("decision") is MemoryType.decision
-    assert MemoryType("fact") is MemoryType.fact
-    assert MemoryType("rule") is MemoryType.rule
-    assert MemoryType("insight") is MemoryType.insight
+from config import AgentID, MAX_MEMORY_CONTENT_LEN, MEMCLAW_API_DOMAIN
 
 
 # ── AgentID constants ─────────────────────────────────────────────────────────

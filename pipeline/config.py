@@ -1,16 +1,7 @@
 """
-Central configuration — agent IDs, memory types, and constants.
+Central configuration — agent IDs and constants.
 Import from here instead of hardcoding strings across agent files.
 """
-
-from enum import Enum
-
-
-class MemoryType(str, Enum):
-    decision = "decision"
-    fact      = "fact"
-    rule      = "rule"
-    insight   = "insight"
 
 
 class AgentID:
