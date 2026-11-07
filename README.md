@@ -603,7 +603,7 @@ Contributions welcome. Useful directions:
 git clone https://github.com/caura-ai/memclaw-build-fleet.git
 cd memclaw-build-fleet
 python -m venv .venv && source .venv/bin/activate  # or .venv\Scripts\Activate.ps1 on Windows
-pip install -r pipeline/requirements.txt
+pip install -r pipeline/requirements-dev.txt
 ```
 ### Running tests
 
