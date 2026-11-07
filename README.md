@@ -189,6 +189,9 @@ pip install -r pipeline/requirements.txt
 
 #### 2. Configure `.env`
 
+Variables exported in your shell or CI take precedence over `.env` values.
+The pipeline and standalone agents load `.env` only to fill in variables that are not already set.
+
 ```bash
 cp .env.example .env   # macOS / Linux
 copy .env.example .env # Windows
@@ -272,6 +275,8 @@ pip install -r pipeline/requirements.txt
 ```
 
 #### 4. Configure `.env` for Ollama
+
+As with the cloud setup, exported environment variables take precedence over `.env` values.
 
 ```env
 LLM_GATEWAY_API_KEY=ollama

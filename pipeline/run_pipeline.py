@@ -46,7 +46,7 @@ if sys.platform == "win32":
 # Load .env BEFORE any module that reads env vars at import time
 try:
     from dotenv import load_dotenv
-    load_dotenv(override=True)
+    load_dotenv()
 except ImportError:
     pass
 
