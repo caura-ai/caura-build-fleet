@@ -81,7 +81,7 @@ def run() -> dict:
 
 if __name__ == "__main__":
     from dotenv import load_dotenv
-    load_dotenv(override=True)
+    load_dotenv()
     out = run()
     print("\n--- Final response ---")
     print(out["final_text"])
