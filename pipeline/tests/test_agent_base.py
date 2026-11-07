@@ -14,6 +14,7 @@ os.environ.setdefault("MEMCLAW_API_KEY",     "test-key")
 os.environ.setdefault("MEMCLAW_TENANT_ID",   "test-tenant")
 os.environ.setdefault("MEMCLAW_FLEET_ID",    "test-fleet")
 os.environ.setdefault("LLM_GATEWAY_API_KEY", "test-llm-key")
+os.environ.setdefault("LLM_GATEWAY_MODEL",   "test-model")
 
 import agent_base
 
@@ -50,6 +51,40 @@ def test_summarise_truncates_long():
 def test_summarise_dict():
     result = agent_base._summarise({"key": "value"})
     assert "key" in result
+
+
+def test_tool_message_content_marks_omitted_results():
+    result = {
+        "results": [
+            {"id": i, "content": f"item-{i}"}
+            for i in range(12)
+        ],
+        "total": 12,
+    }
+
+    output = json.loads(
+        agent_base._tool_message_content("memclaw_recall", result)
+    )
+
+    assert len(output["results"]) == 5
+    assert output["omitted"] == 7
+    assert output["total"] == 12
+
+
+def test_tool_message_content_does_not_mark_omitted_when_all_results_fit():
+    result = {
+        "results": [
+            {"id": i, "content": f"item-{i}"}
+            for i in range(3)
+        ]
+    }
+
+    output = json.loads(
+        agent_base._tool_message_content("memclaw_recall", result)
+    )
+
+    assert len(output["results"]) == 3
+    assert "omitted" not in output
 
 
 # ── run_agent — no tool calls (pure text response) ───────────────────────────
