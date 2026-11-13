@@ -103,23 +103,44 @@ def print_banner():
     print("│" + "  MemClaw Fleet  ·  5-Agent MCP Pipeline".center(W - 2) + "│")
     print("│" + "  Recall Before Acting  ·  Write After Deciding".center(W - 2) + "│")
     print("├" + "─" * (W - 2) + "┤")
-    print(f"│  Started  : {datetime.now().strftime('%Y-%m-%d %H:%M:%S'):<{W - 15}}│")
-    print(f"│  Fleet    : {os.environ.get('MEMCLAW_FLEET_ID', '(not set)'):<{W - 15}}│")
-    print(f"│  Tenant   : {_mask(tenant_raw):<{W - 15}}│")
-    print(f"│  Model    : {os.environ.get('LLM_GATEWAY_MODEL', '(not set)'):<{W - 15}}│")
-    print(f"│  MCP      : {mcp.get_mcp_url():<{W - 15}}│")
+    rows = [
+        ("Started", datetime.now().strftime('%Y-%m-%d %H:%M:%S')),
+        ("Fleet", os.environ.get('MEMCLAW_FLEET_ID', '(not set)')),
+        ("Tenant", _mask(tenant_raw)),
+        ("Model", os.environ.get('LLM_GATEWAY_MODEL', '(not set)')),
+        ("MCP", mcp.get_mcp_url()),
+    ]
+    for label, value in rows:
+        prefix = f"  {label:<9}: "
+        available = W - 2 - len(prefix)
+        if len(value) > available:
+            value = value[:available - 1] + "…"
+        print("│" + prefix + value.ljust(available) + "│")
     print("└" + "─" * (W - 2) + "┘")
     print()
 
 
 def print_pipeline_table(steps):
+    steps = list(steps)
+    widths = (
+        max(3, len(str(len(steps)))),
+        max([22] + [len(name) for name, _, _ in steps]),
+        max([36] + [len(desc) for _, _, desc in steps]),
+    )
+
+    def border(left, middle, right):
+        return "  " + left + middle.join("─" * (width + 2) for width in widths) + right
+
+    def row(number, name, description):
+        return f"  │ {number:^{widths[0]}} │ {name:<{widths[1]}} │ {description:<{widths[2]}} │"
+
     print("  Execution plan")
-    print("  ┌─────┬────────────────────────┬──────────────────────────────────────┐")
-    print("  │  #  │ Agent                  │ MCP Tool Usage                       │")
-    print("  ├─────┼────────────────────────┼──────────────────────────────────────┤")
+    print(border("┌", "┬", "┐"))
+    print(row("#", "Agent", "MCP Tool Usage"))
+    print(border("├", "┼", "┤"))
     for i, (name, _, desc) in enumerate(steps, 1):
-        print(f"  │  {i}  │ {name:<22} │ {desc:<36} │")
-    print("  └─────┴────────────────────────┴──────────────────────────────────────┘")
+        print(row(str(i), name, desc))
+    print(border("└", "┴", "┘"))
     print()
 
 
