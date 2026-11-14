@@ -304,6 +304,38 @@ python pipeline/run_pipeline.py
 
 ---
 
+## Running without Streamable HTTP
+
+Use REST compatibility mode for testing or debugging when you cannot use the
+MCP Streamable HTTP endpoint. After completing either setup above, edit your
+local `.env` to set:
+
+```env
+MEMCLAW_TRANSPORT=rest
+MEMCLAW_API_URL=https://memclaw.net
+```
+
+If using a different MemClaw deployment, substitute its HTTPS base URL without
+the `/api/v1` suffix. Keep `MEMCLAW_API_KEY`, `MEMCLAW_TENANT_ID`,
+`MEMCLAW_FLEET_ID`, and your `LLM_GATEWAY_*` values from setup.
+`MEMCLAW_MCP_URL` is not used in this mode.
+
+From the repository root, verify connectivity, then run the pipeline:
+
+```bash
+python pipeline/run_pipeline.py --dry-run
+python pipeline/run_pipeline.py
+```
+
+The dry run makes a read-only request to the REST stats endpoint. It uses the
+client's built-in tool definitions instead of discovering tools through MCP
+and does not call the LLM. The startup banner may still show an MCP URL; the
+REST request uses `MEMCLAW_API_URL`. The full run still uses your LLM and writes
+memories to the configured fleet. Set `MEMCLAW_TRANSPORT=mcp` in `.env` to switch back
+to the default.
+
+---
+
 ## Running Options
 
 ```bash
