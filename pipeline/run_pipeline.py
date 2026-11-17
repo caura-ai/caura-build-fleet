@@ -129,6 +129,7 @@ def _bootstrap_agent(agent_id: str, label: str) -> None:
     PATCH /api/agents/{agent_id}/trust  {"trust_level": 2}
     """
     written = 0
+    existing = 0
     seeds = [
         {"content": f"{label} bootstrap — agent registration (seed 1).",
          "tags": ["bootstrap", label.lower().replace(" ", "-"), "seed"]},
@@ -143,13 +144,17 @@ def _bootstrap_agent(agent_id: str, label: str) -> None:
                 "tags":       seed["tags"],
             }, agent_id=agent_id)
             if isinstance(result, dict) and result.get("status") == "duplicate":
-                written += 1  # already exists — counts toward trust
+                existing += 1  # already exists — counts toward trust
                 log.debug("%s seed already exists (duplicate) — trust still valid.", label)
             else:
                 written += 1
         except Exception as exc:
             log.warning("%s bootstrap seed failed (non-fatal): %s", label, exc)
-    log.info("%s pre-registered — %d seed write(s) completed (trust_level target: 2).", label, written)
+    log.info(
+        "%s pre-registered — %d seed write(s) completed, "
+        "%d seed(s) already existed (trust_level target: 2).",
+        label, written, existing,
+    )
 
 
 def run_pipeline(steps) -> dict:
